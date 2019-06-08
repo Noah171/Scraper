@@ -10,8 +10,8 @@ use List::Util qw(first); # Import 'first' from core library List::Util which
 use Encode;
 
 # perl syntax is weird, so this is the only way to initialize the hash %validArgs;
-my @options = ("-s", "-a");
-my @funcs = (\&searchSites, \&saveSite);
+my @options = ("-s", "-a", "-l");
+my @funcs = (\&searchSites, \&saveSite, \&listSites);
 my %validArgs;
 @validArgs{@options} = @funcs;
 
@@ -43,21 +43,28 @@ sub main{
 	exit 1;
     }
     
-    # Ensures that the proper number of arguments are sent, otherwise this exits the
-    # program
-    if (scalar(@ARGV)!=2){
-	printUsage();
-    }
-
     # Get the $option's associated function and assign it to $func
     $func = \&{$validArgs{$option}};
     # Get the argument to the option the person is trying to invoke
-    $cmdLineArg = $ARGV[1];
-    
+    if(defined($ARGV[1])){
+	$cmdLineArg = $ARGV[1];
+    } else {
+	$cmdLineArg = "";
+    }
     # Invoke function (This is how you invoke a function who has been assigne to a
     # scalar
     $func->($cmdLineArg);
     
+}
+
+sub makeDirectory{
+    my ($directory) = @_;
+
+    # -d checks to see if this is a valid directory path. If it is not, then make the
+    # directory.
+    if(!(-d $directory)){
+	mkdir($rootFolder);
+    }
 }
 
 # Downloads site information and returns the site's html
@@ -82,20 +89,17 @@ sub saveSite{
     my $path = "";
     
     $path = $rootFolder . $jsonFile;
-    unless (-e $path){               # Checks if the file at the path exists
-	unless (-d $rootFolder){
-	    mkdir($rootFolder);
-	}
-	createFile($path);
-    }
+    
+    makeDirectory($rootFolder);
+    createFile($path);
+    
     
     if(alreadySaved($url, $path) == -1){
 	$json = encode_json($url);
 	open($fh, ">>:encoding(utf-8)", $path) or die $!;
 	$fh->write($json . "\n");
 	close($fh);
-    }
-    else{
+    } else {
 	print("The site $url has previously been added to the database!\n");
     }
 }
@@ -113,13 +117,16 @@ sub alreadySaved{
     return $saved;
 }
 
-# Makes a file 
+# Makes a file after checking to see if the file exists.
 sub createFile{
     my ($path) = @_;
-    my $fh = undef;
-    open ($fh, ">:encoding(utf-8)", $path) or die $!;   
-    $fh->write("");
-    close($fh);
+
+    unless (-e $path){               # Checks if the file at the path exists
+	my $fh = undef;
+	open ($fh, ">:encoding(utf-8)", $path) or die $!;   
+	$fh->write("");
+	close($fh);
+    }
 }
 
 # determine if $arg is a memeber of @arr return -1 if failed
@@ -185,8 +192,20 @@ sub unserializeJson{
     return @objects;
 }
 
+sub listSites{
+
+    my $path = "";
+    $path = $rootFolder . $jsonFile;
+    
+    my @sites = unserializeJson($path);
+    for(my $i = 0; $i < scalar(@sites); ++$i){
+	print("[", $i+1, "] ", $sites[$i], "\n");
+    }
+}
+
+# Prints proper usage and exits program
 sub printUsage{
-    	print("\tError! The proper arguments: <option> <optional argument> <url>.\n\tValid options include:\n\t-s: <argument>: search sites for argument.\n\t-a: to add sites to database.\n");
+    	print("\tError! The proper arguments: <option> <optional argument> <url>.\n\tValid options include:\n\t-s <argument>: search sites for argument.\n\t-a: to add sites to database.\n\t-l: list sites that are in search database.");
         exit 1;
 }
 
